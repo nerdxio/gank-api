@@ -11,52 +11,75 @@ import (
 
 type APIServer struct {
 	listenAddr string
-	storage    Storage
+	store      Storage
 }
 
 // constructor function create new instance of APIServer
-func NewAPIServer(listenAddr string, storage Storage) *APIServer {
+func NewAPIServer(listenAddr string, store Storage) *APIServer {
 	return &APIServer{
 		listenAddr: listenAddr,
-		storage:    storage,
+		store:      store,
 	}
 }
+
 func (s *APIServer) Run() {
 	router := mux.NewRouter()
-	router.HandleFunc("/account", makeHTTPHandleFunc(s.hadnleAccount))
-	router.HandleFunc("/account/{id}", makeHTTPHandleFunc(s.hadnleGetAccount))
+	router.HandleFunc("/account", makeHTTPHandleFunc(s.handleAccount))
+	router.HandleFunc("/account/{id}", makeHTTPHandleFunc(s.handleGetAccountById))
 	log.Println("JSON API Server running on port:", s.listenAddr)
 
 	http.ListenAndServe(s.listenAddr, router)
 }
-func (s *APIServer) hadnleAccount(w http.ResponseWriter, r *http.Request) error {
+
+func (s *APIServer) handleAccount(w http.ResponseWriter, r *http.Request) error {
 	if r.Method == "GET" {
-		return s.hadnleGetAccount(w, r)
+		return s.handleGetAccount(w, r)
 	}
 	if r.Method == "POST" {
-		return s.hadnleCreateAccount(w, r)
+		return s.handleCreateAccount(w, r)
 	}
 	if r.Method == "DELETE" {
-		return s.hadnleDeleteAccount(w, r)
+		return s.handleDeleteAccount(w, r)
 	}
 	return fmt.Errorf("method not allowed %s", r.Method)
 }
 
-func (s *APIServer) hadnleGetAccount(w http.ResponseWriter, r *http.Request) error {
+func (s *APIServer) handleGetAccount(w http.ResponseWriter, r *http.Request) error {
+	accounts,err := s.store.GetAccounts()
+	if err != nil {
+	   return err
+	}
+	return WriteJSON(w,http.StatusOK,accounts)
+}
+
+func (s *APIServer) handleGetAccountById(w http.ResponseWriter, r *http.Request) error {
 	id := mux.Vars(r)["id"]
 	fmt.Println(id)
+	log.Println("GET",r.URL)
 	return WriteJSON(w, http.StatusOK, &Account{})
 }
 
-func (s *APIServer) hadnleCreateAccount(w http.ResponseWriter, r *http.Request) error {
+func (s *APIServer) handleCreateAccount(w http.ResponseWriter, r *http.Request) error {
+	// new create new pointer same as this createAccountReq := CreateAccountRequest{}
+	createAccountReq := new(CreateAccountRequest)
+	if err := json.NewDecoder(r.Body).Decode(createAccountReq); err != nil {
+		return err
+	}
+
+	account := NewAccount(createAccountReq.FirstName, createAccountReq.LastName)
+
+	if err := s.store.CreateAccount(account); err != nil {
+		return err
+	}
+	log.Println("POST",r.URL)
+	return WriteJSON(w, http.StatusOK, account)
+}
+
+func (s *APIServer) handleDeleteAccount(w http.ResponseWriter, r *http.Request) error {
 	return nil
 }
 
-func (s *APIServer) hadnleDeleteAccount(w http.ResponseWriter, r *http.Request) error {
-	return nil
-}
-
-func (s *APIServer) hadnleTransfer(w http.ResponseWriter, r *http.Request) error {
+func (s *APIServer) handleTransfer(w http.ResponseWriter, r *http.Request) error {
 	return nil
 }
 
